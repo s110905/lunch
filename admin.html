@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>團購管理後台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F8F8F8;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .btn {
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        .btn-primary {
+            background-color: #3B82F6; /* Blue */
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #2563EB;
+        }
+        .btn-success {
+            background-color: #22C55E; /* Green */
+            color: white;
+        }
+        .btn-success:hover {
+            background-color: #16A34A;
+        }
+        .btn-danger {
+            background-color: #EF4444; /* Red */
+            color: white;
+        }
+        .btn-danger:hover {
+            background-color: #DC2626;
+        }
+        .btn-secondary {
+            background-color: #6B7280; /* Gray */
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #4B5563;
+        }
+        .input-field {
+            border: 1px solid #D1D5DB;
+            border-radius: 0.5rem;
+            padding: 0.5rem 0.75rem;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        th, td {
+            border: 1px solid #E5E7EB;
+            padding: 0.75rem;
+            text-align: left;
+        }
+        th {
+            background-color: #F3F4F6;
+            font-weight: 600;
+        }
+        .message-box {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: white;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            text-align: center;
+            display: none;
+            max-width: 90%;
+            width: 400px;
+        }
+        .message-box-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl font-bold text-center my-6">餐點管理後台</h1>
+
+        <!-- 產品管理區塊 -->
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-4">午餐品項管理</h2>
+            <div class="flex flex-wrap gap-4 mb-4">
+                <input type="text" id="productNameInput" placeholder="產品名稱" class="input-field flex-grow">
+                <input type="number" id="productPriceInput" placeholder="價格" class="input-field w-24">
+                <button id="addProductBtn" class="btn btn-success">新增餐點</button>
+            </div>
+            <table id="productsTable">
+                <thead>
+                    <tr>
+                        <th>餐點名稱</th>
+                        <th>價格</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- 產品資料將在這裡載入 -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 訂單管理區塊 (已移除) -->
+        <!--
+        <div class="card">
+            <h2 class="text-2xl font-semibold mb-4">訂單管理</h2>
+            <table id="ordersTable">
+                <thead>
+                    <tr>
+                        <th>訂購人姓名</th>
+                        <th>商品選擇</th>
+                        <th>數量</th>
+                        <th>訂購時間</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    
+                </tbody>
+            </table>
+        </div>
+        -->
+    </div>
+
+    <!-- 訊息彈窗 -->
+    <div id="messageOverlay" class="message-box-overlay"></div>
+    <div id="messageBox" class="message-box">
+        <h3 id="messageTitle" class="text-xl font-bold mb-4"></h3>
+        <p id="messageContent" class="mb-6"></p>
+        <button id="closeMessageBox" class="btn btn-primary px-6 py-2">確定</button>
+    </div>
+
+    <script>
+        // 請將此變數替換為您部署的 Google Apps Script Web App URL
+        // IMPORTANT: Replace 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE' with your actual deployed Apps Script Web App URL.
+        const GOOGLE_APPS_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwjGo-GwNuItb_jEMoN83crUntxqUcTN90iQcbJw9OoBB_-ZSTugDYxU4qdMdGZM-6tww/exec'; 
+
+        // DOM 元素
+        const productsTableBody = document.querySelector('#productsTable tbody');
+        // const ordersTableBody = document.querySelector('#ordersTable tbody'); // 訂單表格已移除
+        const productNameInput = document.getElementById('productNameInput');
+        const productPriceInput = document.getElementById('productPriceInput');
+        const addProductBtn = document.getElementById('addProductBtn');
+
+        const messageBox = document.getElementById('messageBox');
+        const messageOverlay = document.getElementById('messageOverlay');
+        const messageTitle = document.getElementById('messageTitle');
+        const messageContent = document.getElementById('messageContent');
+        const closeMessageBox = document.getElementById('closeMessageBox');
+
+        // 顯示訊息彈窗
+        function showMessageBox(title, content) {
+            messageTitle.textContent = title;
+            messageContent.textContent = content;
+            messageOverlay.style.display = 'block';
+            messageBox.style.display = 'block';
+        }
+
+        // 隱藏訊息彈窗
+        function hideMessageBox() {
+            messageOverlay.style.display = 'none';
+            messageBox.style.display = 'none';
+        }
+        closeMessageBox.addEventListener('click', hideMessageBox);
+
+        // --- API 呼叫輔助函式 (POST 請求用 no-cors) ---
+        async function callAppsScript(action, params = {}) {
+            const url = new URL(GOOGLE_APPS_SCRIPT_WEB_APP_URL);
+            url.searchParams.append('action', action); // 添加 action 參數
+
+            const formData = new FormData();
+            for (const key in params) {
+                formData.append(key, params[key]);
+            }
+
+            try {
+                const response = await fetch(url.toString(), {
+                    method: 'POST',
+                    body: formData,
+                    mode: 'no-cors' // POST 請求使用 no-cors 模式
+                });
+
+                console.log(`Action '${action}' request sent. Response type: ${response.type}, status: ${response.status}`);
+                return { status: "success", message: "操作已提交，請檢查 Google Sheet。" }; // 假設成功
+            } catch (error) {
+                console.error(`呼叫 Apps Script 錯誤 (${action}):`, error);
+                throw new Error(`無法連接 Apps Script 服務: ${error.message}`);
+            }
+        }
+
+        // --- 產品管理邏輯 ---
+
+        // 載入產品列表 (GET 請求，嘗試解析 JSON)
+        async function loadProducts() {
+            productsTableBody.innerHTML = '<tr><td colspan="3" class="text-center">載入中...</td></tr>';
+            try {
+                const response = await fetch(`${GOOGLE_APPS_SCRIPT_WEB_APP_URL}?action=getProducts`, {
+                    // Explicitly set credentials to 'omit' for GET requests, sometimes helps with CORS
+                    credentials: 'omit' 
+                });
+                
+                // 嘗試讀取原始響應文本
+                const responseText = await response.text();
+                console.log('getProducts 原始響應文本:', responseText); // 輸出原始響應文本
+
+                let result;
+                try {
+                    result = JSON.parse(responseText); // 嘗試解析為 JSON
+                } catch (jsonError) {
+                    // 如果 JSON 解析失敗，表示 Apps Script 返回的不是有效 JSON
+                    throw new Error(`Apps Script 返回的產品資料不是有效的 JSON。原始響應: ${responseText.substring(0, 200)}...`);
+                }
+
+                if (response.ok && result.status === 'success' && result.products) { // 檢查 response.ok
+                    productsTableBody.innerHTML = ''; // 清空現有內容
+                    if (result.products.length === 0) {
+                        productsTableBody.innerHTML = '<tr><td colspan="3" class="text-center">目前沒有產品。</td></tr>';
+                    } else {
+                        result.products.forEach(product => {
+                            const row = productsTableBody.insertRow();
+                            row.innerHTML = `
+                                <td><input type="text" value="${product['產品名稱'] || ''}" class="input-field product-name-edit" data-row-index="${product.rowIndex}"></td>
+                                <td><input type="number" value="${product['價格'] || ''}" class="input-field product-price-edit" data-row-index="${product.rowIndex}"></td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm update-product-btn" data-row-index="${product.rowIndex}">修改</button>
+                                    <button class="btn btn-danger btn-sm delete-product-btn" data-row-index="${product.rowIndex}">刪除</button>
+                                </td>
+                            `;
+                        });
+                    }
+                } else {
+                    // 如果 Apps Script 返回的 JSON 狀態是 'error' 或 response.ok 為 false
+                    showMessageBox('載入產品失敗', result.message || '無法載入產品列表。');
+                    productsTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-red-500">${result.message || '載入產品失敗'}</td></tr>`;
+                }
+            } catch (error) {
+                console.error('載入產品時發生錯誤:', error);
+                showMessageBox('網路錯誤', `無法載入產品列表：${error.message}`);
+                productsTableBody.innerHTML = `<tr><td colspan="3" class="text-center text-red-500">載入錯誤: ${error.message}</td></tr>`;
+            }
+        }
+
+        // 新增產品
+        addProductBtn.addEventListener('click', async () => {
+            const productName = productNameInput.value.trim();
+            const productPrice = productPriceInput.value.trim();
+
+            if (!productName || !productPrice) {
+                showMessageBox('輸入錯誤', '產品名稱和價格不能為空！');
+                return;
+            }
+
+            showMessageBox('新增中...', '正在新增產品，請稍候...');
+            addProductBtn.disabled = true;
+
+            try {
+                await callAppsScript('addProduct', { productName, price: productPrice });
+                showMessageBox('新增成功', `產品 "${productName}" 已成功新增！`);
+                productNameInput.value = '';
+                productPriceInput.value = '';
+                await loadProducts(); // 重新載入列表
+            } catch (error) {
+                showMessageBox('新增失敗', error.message);
+            } finally {
+                addProductBtn.disabled = false;
+            }
+        });
+
+        // 修改/刪除產品事件委託
+        productsTableBody.addEventListener('click', async (event) => {
+            const target = event.target;
+            const rowIndex = target.dataset.rowIndex;
+
+            if (!rowIndex) return;
+
+            if (target.classList.contains('update-product-btn')) {
+                const row = target.closest('tr');
+                const productName = row.querySelector('.product-name-edit').value.trim();
+                const productPrice = row.querySelector('.product-price-edit').value.trim();
+
+                if (!productName || !productPrice) {
+                    showMessageBox('輸入錯誤', '產品名稱和價格不能為空！');
+                    return;
+                }
+
+                showMessageBox('修改中...', '正在修改產品，請稍候...');
+                try {
+                    await callAppsScript('updateProduct', { rowIndex, productName, price: productPrice });
+                    showMessageBox('修改成功', `產品 (行 ${rowIndex}) 已成功更新！`);
+                    await loadProducts();
+                } catch (error) {
+                    showMessageBox('修改失敗', error.message);
+                }
+            } else if (target.classList.contains('delete-product-btn')) {
+                if (!confirm(`確定要刪除行 ${rowIndex} 的產品嗎？`)) { // 這裡使用 confirm 僅為方便，實際應用應使用自定義彈窗
+                    return;
+                }
+
+                showMessageBox('刪除中...', '正在刪除產品，請稍候...');
+                try {
+                    await callAppsScript('deleteProduct', { rowIndex });
+                    showMessageBox('刪除成功', `產品 (行 ${rowIndex}) 已成功刪除！`);
+                    await loadProducts();
+                } catch (error) {
+                    showMessageBox('刪除失敗', error.message);
+                }
+            }
+        });
+
+        // 頁面載入時自動載入產品
+        document.addEventListener('DOMContentLoaded', () => {
+            loadProducts();
+        });
+    </script>
+</body>
+</html>
