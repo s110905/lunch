@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>午餐訂購頁面</title>
+    <title>蛋捲團購訂單</title>
     <!-- 引入 Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -126,21 +126,32 @@
                 選擇數量
             </div>
             <div class="flex flex-wrap gap-4">
-                <button type="button" class="quantity-select-btn quantity-btn" data-quantity="1">1</button>
-                <button type="button" class="quantity-select-btn quantity-btn" data-quantity="2">2</button>
-                <button type="button" class="quantity-select-btn quantity-btn" data-quantity="3">3</button>
-                <button type="button" class="quantity-select-btn quantity-btn" data-quantity="4">4</button>
-                <button type="button" class="quantity-select-btn quantity-btn" data-quantity="5">5</button>
+                <button type="button" class="quantity-select-btn quantity-btn" data-quantity="1">1盒</button>
+                <button type="button" class="quantity-select-btn quantity-btn" data-quantity="2">2盒</button>
+                <button type="button" class="quantity-select-btn quantity-btn" data-quantity="3">3盒</button>
+                <button type="button" class="quantity-select-btn quantity-btn" data-quantity="4">4盒</button>
+                <button type="button" class="quantity-select-btn quantity-btn" data-quantity="5">5盒</button>
             </div>
             <input type="hidden" id="selectedQuantity" name="quantity" required>
         </div>
 
         <!-- 送出訂單按鈕 -->
-        <div class="text-center">
+        <div class="text-center mb-8">
             <button type="submit" id="submitOrderBtn" class="btn-primary w-full md:w-auto">
                 <svg class="inline-block w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                 送出訂單
             </button>
+        </div>
+
+        <!-- 今日訂購商品數量區塊 -->
+        <div class="card p-6">
+            <h3 class="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                <svg class="w-5 h-5 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                今日訂購商品數量
+            </h3>
+            <div id="todayOrderSummaryContainer" class="text-gray-700">
+                <p>載入今日訂單中...</p>
+            </div>
         </div>
     </div>
 
@@ -155,7 +166,7 @@
     <script>
         // 請將此變數替換為您部署的 Google Apps Script Web App URL
         // IMPORTANT: Replace 'YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL_HERE' with your actual deployed Apps Script Web App URL.
-        const GOOGLE_APPS_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbwjGo-GwNuItb_jEMoN83crUntxqUcTN90iQcbJw9OoBB_-ZSTugDYxU4qdMdGZM-6tww/exec'; 
+        const GOOGLE_APPS_SCRIPT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzmPsdxAdNS445MgjjbDP1nLmg0EMgavIjE26vjEUkjes_h90mW5KDsTb_cSmvJaV2ZZw/exec'; 
 
         // 獲取 DOM 元素
         const customerNameInput = document.getElementById('customerName');
@@ -165,6 +176,7 @@
         const selectedProductInput = document.getElementById('selectedProduct');
         const selectedQuantityInput = document.getElementById('selectedQuantity');
         const submitOrderBtn = document.getElementById('submitOrderBtn');
+        const todayOrderSummaryContainer = document.getElementById('todayOrderSummaryContainer'); // 新增的 DOM 元素
 
         const messageBox = document.getElementById('messageBox');
         const messageOverlay = document.getElementById('messageOverlay');
@@ -192,6 +204,31 @@
         // 關閉彈窗按鈕事件
         closeMessageBox.addEventListener('click', hideMessageBox);
 
+        // --- API 呼叫輔助函式 (POST 請求用 no-cors) ---
+        async function callAppsScript(action, params = {}) {
+            const url = new URL(GOOGLE_APPS_SCRIPT_WEB_APP_URL);
+            url.searchParams.append('action', action); // 添加 action 參數
+
+            const formData = new FormData();
+            for (const key in params) {
+                formData.append(key, params[key]);
+            }
+
+            try {
+                const response = await fetch(url.toString(), {
+                    method: 'POST',
+                    body: formData,
+                    mode: 'no-cors' // POST 請求使用 no-cors 模式
+                });
+
+                console.log(`Action '${action}' request sent. Response type: ${response.type}, status: ${response.status}`);
+                return { status: "success", message: "操作已提交，請檢查 Google Sheet。" }; // 假設成功
+            } catch (error) {
+                console.error(`呼叫 Apps Script 錯誤 (${action}):`, error);
+                throw new Error(`無法連接 Apps Script 服務: ${error.message}`);
+            }
+        }
+
         // --- 產品載入邏輯 ---
         async function loadProductsForOrderPage() {
             productButtonsContainer.innerHTML = '<p class="text-gray-500">載入產品中...</p>';
@@ -210,7 +247,7 @@
                     throw new Error(`Apps Script 返回的產品資料不是有效的 JSON。原始響應: ${responseText.substring(0, 200)}...`);
                 }
 
-                if (response.ok && result.status === 'success' && result.products) {
+                if (response.ok && result.status === 'success' && result.products) { // 檢查 response.ok
                     productButtonsContainer.innerHTML = ''; // 清空載入訊息
                     if (result.products.length === 0) {
                         productButtonsContainer.innerHTML = '<p class="text-gray-500">目前沒有可供選擇的產品。</p>';
@@ -220,7 +257,7 @@
                             button.type = 'button';
                             button.classList.add('product-select-btn', 'quantity-btn'); // 沿用現有樣式
                             button.dataset.product = product['產品名稱'];
-                            button.dataset.price = product['價格'];
+                            button.dataset.price = product['價格']; // 雖然訂購頁面不直接用價格，但保留以防未來擴展
                             button.textContent = `${product['產品名稱']} NT$ ${product['價格']}/盒`;
                             productButtonsContainer.appendChild(button);
                         });
@@ -235,7 +272,7 @@
                     }
                 } else {
                     showMessageBox('載入產品失敗', result.message || '無法載入產品列表。');
-                    productButtonsContainer.innerHTML = `<p class="text-red-500">${result.message || '載入產品失敗'}</p>`;
+                    productButtonsContainer.innerHTML = `<p class="text-red-500">${result.message || '載入產品失敗'}</p`;
                 }
             } catch (error) {
                 console.error('載入產品時發生錯誤 (for order page):', error);
@@ -288,13 +325,6 @@
                 return;
             }
 
-            // 準備要提交的資料
-            const formData = new FormData();
-            formData.append('action', 'addOrder'); // 指定 Apps Script 的 action
-            formData.append('customerName', customerName);
-            formData.append('productSelection', selectedProduct);
-            formData.append('quantity', selectedQuantity);
-
             // 顯示載入訊息
             showMessageBox('提交中...', '您的訂單正在處理中，請稍候...');
             submitOrderBtn.disabled = true; // 禁用按鈕防止重複提交
@@ -303,7 +333,15 @@
                 // 發送 POST 請求到 Google Apps Script Web App
                 const response = await fetch(GOOGLE_APPS_SCRIPT_WEB_APP_URL, {
                     method: 'POST',
-                    body: formData,
+                    body: new URLSearchParams({ // 使用 URLSearchParams 替代 FormData，更適合簡單的 key-value 對
+                        action: 'addOrder',
+                        customerName: customerName,
+                        productSelection: selectedProduct,
+                        quantity: selectedQuantity
+                    }),
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded' // 指定內容類型
+                    },
                     mode: 'no-cors' // 使用 no-cors 模式
                 });
 
@@ -321,6 +359,10 @@
                 selectedQuantityInput.value = '';
                 productSelectBtns.forEach(btn => btn.classList.remove('selected')); // 清除所有商品按鈕的選取狀態
                 quantitySelectBtns.forEach(btn => btn.classList.remove('selected'));
+
+                // 訂單成功後，重新載入今日訂單數量
+                loadTodayOrderSummary(); 
+
             } catch (error) {
                 console.error('送出訂單時發生錯誤:', error);
                 showMessageBox('網路錯誤', error.message || '無法連接伺服器，請檢查您的網路連線或稍後再試。');
@@ -329,8 +371,67 @@
             }
         });
 
-        // 頁面載入時自動載入產品
-        document.addEventListener('DOMContentLoaded', loadProductsForOrderPage);
+        // --- 載入今日訂單數量匯總邏輯 ---
+        async function loadTodayOrderSummary() {
+            todayOrderSummaryContainer.innerHTML = '<p class="text-gray-500">載入今日訂單中...</p>';
+            try {
+                const response = await fetch(`${GOOGLE_APPS_SCRIPT_WEB_APP_URL}?action=getTodayOrderSummary`, {
+                    credentials: 'omit'
+                });
+
+                const responseText = await response.text();
+                console.log('getTodayOrderSummary 原始響應文本:', responseText);
+
+                let result;
+                try {
+                    result = JSON.parse(responseText);
+                } catch (jsonError) {
+                    throw new Error(`Apps Script 返回的今日訂單資料不是有效的 JSON。原始響應: ${responseText.substring(0, 200)}...`);
+                }
+
+                if (response.ok && result.status === 'success' && result.summary) {
+                    todayOrderSummaryContainer.innerHTML = ''; // 清空載入訊息
+                    const summary = result.summary;
+                    const productNames = Object.keys(summary);
+
+                    if (productNames.length === 0) {
+                        todayOrderSummaryContainer.innerHTML = '<p>今日目前沒有訂單。</p>';
+                    } else {
+                        // 使用 flexbox 進行排版，讓數量對齊
+                        productNames.forEach(productName => {
+                            const quantity = summary[productName];
+                            const summaryItem = document.createElement('div');
+                            summaryItem.classList.add('flex', 'justify-between', 'items-baseline', 'py-1', 'border-b', 'border-gray-200', 'last:border-b-0'); // 添加 Tailwind 類別
+                            
+                            const nameSpan = document.createElement('span');
+                            nameSpan.classList.add('font-medium', 'text-gray-800');
+                            nameSpan.textContent = productName;
+
+                            const quantitySpan = document.createElement('span');
+                            quantitySpan.classList.add('text-right', 'text-gray-600', 'font-semibold'); // 數量靠右對齊
+                            quantitySpan.textContent = `${quantity} 盒`;
+
+                            summaryItem.appendChild(nameSpan);
+                            summaryItem.appendChild(quantitySpan);
+                            todayOrderSummaryContainer.appendChild(summaryItem);
+                        });
+                    }
+                } else {
+                    showMessageBox('載入今日訂單失敗', result.message || '無法載入今日訂單數量。');
+                    todayOrderSummaryContainer.innerHTML = `<p class="text-red-500">${result.message || '載入今日訂單失敗'}</p>`;
+                }
+            } catch (error) {
+                console.error('載入今日訂單時發生錯誤:', error);
+                showMessageBox('網路錯誤', `無法載入今日訂單數量，請檢查網路或 Apps Script：${error.message}`);
+                todayOrderSummaryContainer.innerHTML = `<p class="text-red-500">載入錯誤: ${error.message}</p>`;
+            }
+        }
+
+        // 頁面載入時自動載入產品和今日訂單數量
+        document.addEventListener('DOMContentLoaded', () => {
+            loadProductsForOrderPage();
+            loadTodayOrderSummary(); // 載入今日訂單數量
+        });
     </script>
 </body>
 </html>
